@@ -4,12 +4,14 @@
 #include <unordered_map>
 #include <vector>
 #include <stack>
+#include <utility>
 struct node {
     int val;
 };
 int state = 0;
 std::vector<std::string> state_stack;
 
+std::vector<std::pair<std::string, int> > production_rule;
 
 std::unordered_map<std::string, int> stringToNumberMap;
 
@@ -31,8 +33,6 @@ std::string state_table[16][11] = {
     {"","R5","R5","R5","R5","","R5","R5","","",""},
     {"","R7","R7","R7","R7","","R7","R7","","",""}
 
-
-    
 };
 
 
@@ -52,8 +52,18 @@ node* make_leaf() {
     return myNodePtr;
 }
 
-void shift(){
-
+void shift(std::string located, std::vector<std::string>* input, int index){
+    if(located.size() < 3) {
+        state = located[1] - '0';
+    } else {
+        std::string table_located = "";
+        table_located += located[1];
+        table_located += located[2];
+        state = std::stoi(table_located);
+    }
+    
+    state_stack.push_back((*input)[index]);
+    state_stack.push_back(std::to_string(state));
 }
 
 void reduce(){
@@ -72,11 +82,22 @@ void initializeMap() {
     stringToNumberMap["E"] = 8;
     stringToNumberMap["T"] = 9;
     stringToNumberMap["F"] = 10;
+
+    production_rule.push_back(std::make_pair("E", 3));
+    production_rule.push_back(std::make_pair("E", 3));
+    production_rule.push_back(std::make_pair("E", 1));
+    production_rule.push_back(std::make_pair("T", 3));
+    production_rule.push_back(std::make_pair("T", 3));
+    production_rule.push_back(std::make_pair("T", 1));
+    production_rule.push_back(std::make_pair("F", 3));
+    production_rule.push_back(std::make_pair("F", 1));
 }
 
 
 int main (int argc, char* argv[]) {
     std::vector<std::string> input;
+    std::vector<std::string>* vectorPtr = &input;
+
     for (int i = 1; i < argc; ++i){
         input.push_back(argv[i]);
 
@@ -94,7 +115,13 @@ int main (int argc, char* argv[]) {
             std::cout << state_stack[i];
         }
         std::cout << std::endl;
+
+        std::cout << "index: " << index << std::endl;
         std::cout << "input: " << input[index] << std::endl;
+        for(int i = 0; i < input.size(); ++i) {
+            std::cout << input[i];
+        }
+        std::cout << std::endl;
         std::cout << "state: " << state_stack.back() << std::endl;
 
         std::string located = locate(std::stoi(state_stack.back()), input[index]);
@@ -102,34 +129,64 @@ int main (int argc, char* argv[]) {
 
        
         if(located[0] == 'S'){
-            std::cout << "Shift";
+            std::cout << "<<<<<<<<<<<Shift>>>>>>>>>>>" << std::endl;
             std::cout << located[1];
             std::cout << input[index];
-
-            state = located[1] - '0';
+            std::cout << "size: " << located.size();
+            shift(located, vectorPtr, index);
+            /*
+            if(located.size() < 3) {
+                state = located[1] - '0';
+            } else {
+                std::string table_located = "";
+                table_located += located[1];
+                table_located += located[2];
+                state = std::stoi(table_located);
+            }
+            
             state_stack.push_back(input[index]);
-            state_stack.push_back(std::to_string(located[1] - '0'));
+            state_stack.push_back(std::to_string(state));*/
+            index++;
+
 
         } else if(located[0] == 'R') {
-            std::cout << "Reduce";
+            std::cout << "<<<<<<<<<<<Reduce>>>>>>>>>>>" << std::endl;
+            int reduce_state = located[1] - '0';
+            std::string reduced_value = (production_rule[reduce_state-1]).first;
+            int production_length = (production_rule[reduce_state-1]).second;
+            std::cout << "rule first " << reduced_value << std::endl;
+            std::cout << "rule second " << production_length << std::endl;
+            
+            for(int i = 0; i < production_length; ++i) {
+                std::cout << "popped: " << state_stack.back() << std::endl;
+                state_stack.pop_back();
+                std::cout << "popped: " << state_stack.back() << std::endl;
+                state_stack.pop_back();
+            }
+            input.insert(input.begin() + index , reduced_value);
 
-            std::cout << "popped: " << state_stack.back() << std::endl;
+            /*std::cout << "popped: " << state_stack.back() << std::endl;
             state_stack.pop_back();
             std::cout << "popped: " << state_stack.back() << std::endl;
             state_stack.pop_back();
             input.insert(input.begin()+ index + 1, "F");
-
+            */
 
         } else if(located[0] == 'A') {
             std::cout << "Accept";
+            break;
         } else if(located.empty()) {
             std::cout << "Error";
+            index++;
+
         } else {
-            std::cout << "num";
-            break;
+            std::cout << "<<<<<<<<<<<<<num shift>>>>>>>>>>>>";
+            state_stack.push_back(input[index]);
+            state_stack.push_back(located);
+            index++;
+
         }
 
-        index++;
         std::cout << std::endl;
         std::cout << std::endl;
 
