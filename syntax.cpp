@@ -11,6 +11,7 @@
 struct node {
     int state;
     std::string symbol;
+    std::string held_symbol;
     node* self;
     node* left;
     node* right;
@@ -19,12 +20,9 @@ struct node {
 };
 std::vector<std::vector<node*> > tree;
 
-std::vector<node*> tree_nodes;
-
+std::vector<node*> tree_nodes; 
 int state = 0;
-
-
-std::vector<node> state_stack;
+std::vector<node*> state_stack;
 
 std::vector<std::pair<std::string, std::string> > production_rule;
 
@@ -66,9 +64,10 @@ node* make_tree(int state, std::string symbol, node* left, node* right) {
     
 }
 
-node* make_leaf(std::string token, node* address) {
-    node* myNodePtr = new node(0, "n", nullptr, nullptr);
-    //myNodePtr->val = 0;
+node* make_leaf(int state, std::string token, node* address) {
+    node* myNodePtr = new node(state, token, address, nullptr);
+    tree_nodes.push_back(myNodePtr);
+
     return myNodePtr;
 }
 
@@ -110,9 +109,22 @@ void output_tree(node* root) {
 
         for (int j = 0; j < tree[i].size(); ++j) {
             std::string symb = tree[i][j]->symbol;
+            std::string held_symb = tree[i][j]->held_symbol;
+
             if(symb != "NULL") {
-                std::cout << symb;
+                if(!held_symb.empty()) {
+                    if(held_symb == "()") {
+                        std::cout << "( " << symb << " )";
+                    }else {
+                        std::cout << symb << held_symb;
+
+                    }
+                } else {
+                    std::cout << symb;
+
+                }
             }
+
 
             if (j < tree[i].size() - 1) {
                 std::cout << std::setw(spacing * 2) << "";
@@ -132,8 +144,8 @@ void shift(std::string located, std::vector<std::string>* input, int index){
         table_located += located[2];
         state = std::stoi(table_located);
     }
-    node newNode(state, ((*input)[index]), nullptr, nullptr);
-
+    node* newNode = new node(state, ((*input)[index]), nullptr, nullptr);
+    std::cout << newNode << std::endl;
     state_stack.push_back(newNode);
     //state_stack.push_back(std::to_string(state));
 }
@@ -193,7 +205,7 @@ int main (int argc, char* argv[]) {
 
     int index = 0;
     node intial_node(0, "$", nullptr, nullptr);
-    state_stack.push_back(intial_node);
+    state_stack.push_back(&intial_node);
     std::cout << std::setw(20) << std::left << "stack"
               << std::setw(20) << std::left << "input"
               << std::setw(10) << std::left << "entry"
@@ -204,7 +216,7 @@ int main (int argc, char* argv[]) {
         std::string temp_stack = "";
         std::string temp_input = "";
         for(int i = 0; i < state_stack.size(); ++i) {
-            temp_stack += (state_stack[i]).symbol;
+            temp_stack += (state_stack[i])->symbol;
         }
         for(int i = index; i < input.size(); ++i) {
             temp_input += input[i];
@@ -213,12 +225,13 @@ int main (int argc, char* argv[]) {
         std::cout << std::setw(20) << std::left << temp_stack
                   << std::setw(20) << std::left << temp_input;
 
-        std::string located = locate((state_stack.back().state), input[index]);
+        std::string located = locate((state_stack.back()->state), input[index]);
 
         if(located[0] == 'S'){
             std::cout << std::setw(10) << std::left << located
                       << std::setw(20) << std::left << "Shift";
 
+            
             shift(located, vectorPtr, index);
             
             index++;
@@ -247,12 +260,12 @@ int main (int argc, char* argv[]) {
             std::cout << reduced_value << "->" << production;
             
             for(int i = 0; i < production_length; ++i) {
-                rhs.push_back(&state_stack.back());
+                rhs.insert(rhs.begin(), state_stack.back());
                 state_stack.pop_back();
             }
             //std::cout << "NEW STATE" << (&state_stack.back())->state << std::endl;
 
-            std::string located = locate((&state_stack.back())->state, reduced_value);
+            std::string located = locate(state_stack.back()->state, reduced_value);
             /*std::cout << std::endl;
             std::cout << "state: " << state << std::endl;
             std::cout << "reduced value : " <<  reduced_value << std::endl;
@@ -260,7 +273,17 @@ int main (int argc, char* argv[]) {
             std::cout << "LOCATED: " << located << std::endl;
             */
             node* node_new = nullptr;
-            if(production_length > 2) {
+            if(rhs[0]->symbol == "(" && rhs[2]->symbol == ")" ) {
+                std::cout << "PARENTHE";
+                node_new = make_leaf(stoi(located), reduced_value, rhs[1]);
+                node_new->held_symbol = "()";
+                std::cout << std::endl;
+                std::cout << "RHS1: " << rhs[0]->symbol <<std::endl;
+                std::cout << "RHS2: " << rhs[1]->left <<std::endl;
+                std::cout << "RHS3: " << rhs[2]->symbol <<std::endl;
+
+
+            } else if(production_length > 2) {
                 //std::cout << "MADE IT" << std::flush;
                 //node_new = make_tree(rhs[1]->symbol, rhs[0], rhs[2]);
                 //output_tree(node_new);
@@ -268,22 +291,33 @@ int main (int argc, char* argv[]) {
 
                 //node_new = new node(stoi(located), reduced_value, nullptr, nullptr);
 
-                node_new = make_tree(stoi(located), "+" , rhs[1], rhs[2]);
+                node_new = make_tree(stoi(located), reduced_value, rhs[0], rhs[2]);
+                node_new->held_symbol = rhs[1]->symbol;
             } else {
-                node_new = new node(stoi(located), reduced_value, nullptr, nullptr);
+                node_new = make_leaf(stoi(located), reduced_value, rhs[0]);
+                //node_new = new node(stoi(located), reduced_value, nullptr, nullptr);
+                //tree_nodes.push_back(node_new);
+
             }
 
-            state_stack.push_back(*node_new);
+            state_stack.push_back(node_new);
             
             //input.insert(input.begin() + index , reduced_value);
 
         } else if(located[0] == 'A') {
-
             std::cout << "TREE NODES: " << std::endl;
             for(int i = 0; i < tree_nodes.size(); ++i) {
+                
                 std::cout << tree_nodes[i] << std::endl;
+                if(!tree_nodes[i]->held_symbol.empty()) {
+                    std::cout << tree_nodes[i]->held_symbol << std::endl;
+                }
+                std::cout << tree_nodes[i]->symbol << std::endl;
+                std::cout << tree_nodes[i]->left << std::endl;
+                std::cout << tree_nodes[i]->right << std::endl;
             }
 
+            output_tree(tree_nodes[tree_nodes.size() - 1]);
             std::cout << "Accept";
             break;
         } else if(located.empty()) {
@@ -295,7 +329,7 @@ int main (int argc, char* argv[]) {
                       << std::setw(20) << std::left << "Shift";
 
             node numNode(stoi(located), ((input)[index]), nullptr, nullptr);
-            state_stack.push_back(numNode);
+            state_stack.push_back(&numNode);
             index++;
 
         }
